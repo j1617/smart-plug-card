@@ -1,11 +1,11 @@
 /**
  * Smart Plug Card - Home Assistant Lovelace Custom Card
- * Version: 1.0.0
+ * Version: 1.1.0
  * Description: Display smart plug status (power, voltage, current, energy usage)
  */
 
 console.info(
-  '%c SMART-PLUG-CARD %c v1.0.0 ',
+  '%c SMART-PLUG-CARD %c v1.1.0 ',
   'color: #7c3aed; font-weight: bold; background: #f5f3ff; padding: 2px 6px; border-radius: 3px 0 0 3px;',
   'color: white; background: #7c3aed; padding: 2px 6px; border-radius: 0 3px 3px 0;'
 );
@@ -106,19 +106,19 @@ class SmartPlugCard extends HTMLElement {
 
     if (typeof entityConfig === 'object') {
       const powerState = this._getState(entityConfig.power_entity);
-      power = this._getValue(powerState, 'unit_of_measurement') === 'W' ? powerState?.state : this._getValue(powerState, 'state');
+      power = powerState ? powerState.state : null;
       
       const voltageState = this._getState(entityConfig.voltage_entity);
-      voltage = this._getValue(voltageState, 'unit_of_measurement') === 'V' ? voltageState?.state : this._getValue(voltageState, 'state');
+      voltage = voltageState ? voltageState.state : null;
       
       const currentState = this._getState(entityConfig.current_entity);
-      current = this._getValue(currentState, 'unit_of_measurement') === 'A' ? currentState?.state : this._getValue(currentState, 'state');
+      current = currentState ? currentState.state : null;
       
       const dailyState = this._getState(entityConfig.daily_energy_entity);
-      daily = this._getValue(dailyState, 'state');
+      daily = dailyState ? dailyState.state : null;
       
       const monthlyState = this._getState(entityConfig.monthly_energy_entity);
-      monthly = this._getValue(monthlyState, 'state');
+      monthly = monthlyState ? monthlyState.state : null;
 
       // 指示灯
       if (entityConfig.indicator_entity) {
@@ -128,19 +128,19 @@ class SmartPlugCard extends HTMLElement {
     } else {
       // 单个插座模式：从根配置读取
       const powerState = this._getState(this.config.power_entity);
-      power = this._getValue(powerState, 'state');
+      power = powerState ? powerState.state : null;
       
       const voltageState = this._getState(this.config.voltage_entity);
-      voltage = this._getValue(voltageState, 'state');
+      voltage = voltageState ? voltageState.state : null;
       
       const currentState = this._getState(this.config.current_entity);
-      current = this._getValue(currentState, 'state');
+      current = currentState ? currentState.state : null;
       
       const dailyState = this._getState(this.config.daily_energy_entity);
-      daily = this._getValue(dailyState, 'state');
+      daily = dailyState ? dailyState.state : null;
       
       const monthlyState = this._getState(this.config.monthly_energy_entity);
-      monthly = this._getValue(monthlyState, 'state');
+      monthly = monthlyState ? monthlyState.state : null;
 
       if (this.config.indicator_entity) {
         const indicatorState = this._getState(this.config.indicator_entity);
