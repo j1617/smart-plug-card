@@ -1,12 +1,27 @@
 # 更新日志
 
+## [1.2.0] - 2026-05-12
+
+### 新增
+- 💡 新增 `indicator_light_entity` 指示灯传感器配置
+  - 可配置电量 sensor，显示指示灯亮度或其他状态
+  - 显示 💡 图标
+- 📱 新增 `display_mode` 显示模式配置
+  - `vertical`（默认）：纵向列表
+  - `horizontal`：横向Grid布局，多设备并排显示
+- 🔢 新增 `columns` 列数配置
+  - horizontal 模式下的列数，默认 2 列
+- 🎨 优化 CSS 样式
+  - 防止文字截断，使用 ellipsis
+  - 响应式布局适配
+  - 自适应宽度，overflow: visible
+
 ## [1.1.0] - 2026-05-12
 
 ### 修复
 - 🐛 修复传感器数值读取逻辑错误
   - 之前：功率/电压/电流/用电量实体配置后仍显示 "--"
-  - 原因：`_getValue` 方法传入了错误的 attribute 参数，导致读取 `state.attributes['state']`（不存在）而非 `state.state`
-  - 现在：直接读取 `state.state`，所有传感器字段正确显示数值
+  - 现在：直接读取 state.state，所有传感器字段正确显示数值
 
 ## [1.0.0] - 2026-05-12
 
