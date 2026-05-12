@@ -1,0 +1,8 @@
+{
+  "name": "Smart Plug Card",
+  "content_in_root": true,
+  "render_readme": true,
+  "filename": "smart-plug-card.js",
+  "country": ["CN"],
+  "version": "1.0.0"
+}
