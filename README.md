@@ -5,12 +5,12 @@ HA插件交流QQ群： 754364399
 关注公众号【工具箱达人】，里面有详细的使用教程
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://hacs.xyz/)
-[![version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/j1617/smart-plug-card)
+[![version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/j1617/smart-plug-card)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 一个优雅的 Home Assistant Lovelace 自定义卡片，显示智能插座的开关状态、功率、电压、电流及用电量。
 
-**当前版本: v1.2.0**
+**当前版本: v1.3.0**
 
 ## 预览效果
 
@@ -64,7 +64,8 @@ HA插件交流QQ群： 754364399
 - ⚡ **功率/电压/电流** - 实时显示三相参数
 - 📊 **用电量** - 日用电量、月用电量
 - 📱 **多模式显示** - 纵向列表 / 横向Grid布局
-- 🎨 **紫色主题** - 优雅的紫色主题设计
+- 🎨 **主题适配** - 自动适配HA深色/浅色主题
+- 🔧 **HA 2024.x+ 兼容** - 支持Grid布局和可见性功能
 - 🔄 **可选字段** - 未配置的字段显示 "--"
 
 ## 安装方法
@@ -207,9 +208,30 @@ entities:
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| `background_color` | string | #ffffff | 卡片背景色 |
-| `text_color` | string | #1e293b | 主文字颜色 |
-| `secondary_color` | string | #64748b | 次要文字颜色 |
+| `background_color` | string | var(--ha-card-background) | 卡片背景色 |
+| `text_color` | string | var(--primary-text-color) | 主文字颜色 |
+| `secondary_color` | string | var(--secondary-text-color) | 次要文字颜色 |
+
+## HA 兼容性
+
+### Grid 布局支持
+
+卡片支持 Home Assistant 2024.x+ 的 Grid 布局系统：
+
+- `getCardSize()` - 返回准确的卡片尺寸
+- `getGridOptions()` - 响应式Grid配置
+- `getLayoutOptions()` - 支持可见性和布局选项
+
+### 主题变量
+
+使用 HA CSS 变量，自动适配深色/浅色主题：
+
+- `--ha-card-background` - 卡片背景
+- `--primary-text-color` - 主文字颜色
+- `--secondary-text-color` - 次要文字颜色
+- `--success-color` - 成功/开启颜色
+- `--error-color` - 错误/关闭颜色
+- `--primary-color` - 主题色
 
 ## 故障排除
 
@@ -229,10 +251,11 @@ entities:
 2. 检查 `columns` 值是否适合屏幕宽度
 3. 尝试减少列数：`columns: 1` 或 `columns: 2`
 
-### 样式问题
+### 深色主题适配
+
+卡片默认使用 HA 主题变量，会自动适配。如需自定义：
 
 ```yaml
-# 深色主题
 background_color: '#1a1f2e'
 text_color: '#f1f5f9'
 secondary_color: '#94a3b8'
@@ -240,6 +263,7 @@ secondary_color: '#94a3b8'
 
 ## 更新日志
 
+- **v1.3.0**：支持 HA 2024.x+ Grid布局和可见性、主题变量
 - **v1.2.0**：新增横向显示模式、列数配置、indicator_light_entity
 - **v1.1.0**：修复传感器数值读取问题
 - **v1.0.0**：首次发布
@@ -247,7 +271,7 @@ secondary_color: '#94a3b8'
 ## 项目信息
 
 - **GitHub**: https://github.com/j1617/smart-plug-card
-- **版本**: v1.2.0
+- **版本**: v1.3.0
 - **许可证**: MIT
 
 ## 许可证

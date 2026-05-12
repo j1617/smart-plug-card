@@ -1,11 +1,12 @@
 /**
  * Smart Plug Card - Home Assistant Lovelace Custom Card
- * Version: 1.2.0
+ * Version: 1.3.0
  * Description: Display smart plug status (power, voltage, current, energy usage)
+ * Compatible with HA 2024.x+ grid layout and visibility features
  */
 
 console.info(
-  '%c SMART-PLUG-CARD %c v1.2.0 ',
+  '%c SMART-PLUG-CARD %c v1.3.0 ',
   'color: #7c3aed; font-weight: bold; background: #f5f3ff; padding: 2px 6px; border-radius: 3px 0 0 3px;',
   'color: white; background: #7c3aed; padding: 2px 6px; border-radius: 0 3px 3px 0;'
 );
@@ -16,12 +17,30 @@ class SmartPlugCard extends HTMLElement {
     this.attachShadow({ mode: 'open' });
   }
 
+  // HA 配置验证
+  static getConfigElement() {
+    return document.createElement('smart-plug-card-editor');
+  }
+
+  static getStubConfig() {
+    return {
+      title: '智能插座',
+      display_mode: 'vertical',
+      columns: 2,
+      entities: []
+    };
+  }
+
   setConfig(config) {
+    if (!config.switch_entity && (!config.entities || config.entities.length === 0)) {
+      throw new Error('需要配置 switch_entity 或 entities');
+    }
+
     this.config = {
       // 默认配置
       title: '智能插座',
-      display_mode: 'vertical',  // vertical | horizontal
-      columns: 2,               // horizontal 模式下的列数
+      display_mode: 'vertical',
+      columns: 2,
       // 实体配置
       entities: config.entities || [],
       // 单个插座配置（兼容）
@@ -31,16 +50,18 @@ class SmartPlugCard extends HTMLElement {
       current_entity: config.current_entity || null,
       daily_energy_entity: config.daily_energy_entity || null,
       monthly_energy_entity: config.monthly_energy_entity || null,
-      // 指示灯状态（binary_sensor，on/off）
+      // 指示灯
       indicator_entity: config.indicator_entity || null,
-      // 指示灯亮度/状态（sensor，显示亮度或其他状态）
       indicator_light_entity: config.indicator_light_entity || null,
-      // 样式配置
-      background_color: '#ffffff',
-      text_color: '#1e293b',
-      secondary_color: '#64748b',
+      // 样式配置（使用HA变量作为默认值）
+      background_color: 'var(--ha-card-background, #ffffff)',
+      text_color: 'var(--primary-text-color, #1e293b)',
+      secondary_color: 'var(--secondary-text-color, #64748b)',
       ...config
     };
+
+    // 保存配置用于 getCardSize
+    this._entityCount = this._getEntityCount();
     this._updateCard();
   }
 
@@ -51,6 +72,44 @@ class SmartPlugCard extends HTMLElement {
 
   connectedCallback() {
     this._updateCard();
+  }
+
+  // 获取实体数量
+  _getEntityCount() {
+    if (this.config.entities && this.config.entities.length > 0) {
+      return this.config.entities.length;
+    }
+    return this.config.switch_entity ? 1 : 0;
+  }
+
+  // HA Grid 布局支持 - 返回卡片占用的高度单位
+  getCardSize() {
+    const count = this._entityCount || 1;
+    if (this.config.display_mode === 'horizontal') {
+      // 横向模式：根据列数计算行数
+      const cols = this.config.columns || 2;
+      const rows = Math.ceil(count / cols);
+      return Math.max(rows * 3, 3);
+    }
+    // 纵向模式：每个插座约3单位，最多6
+    return Math.min(count * 3, 6);
+  }
+
+  // HA Grid 布局选项 - 响应式配置
+  getGridOptions() {
+    const count = this._entityCount || 1;
+    return {
+      columns: this.config.display_mode === 'horizontal' ? 12 : 6,
+      rows: Math.min(Math.ceil(count / (this.config.display_mode === 'horizontal' ? (this.config.columns || 2) : 1)) * 2, 4)
+    };
+  }
+
+  // HA 可见性支持
+  getLayoutOptions() {
+    return {
+      grid_columns: this.config.display_mode === 'horizontal' ? 12 : 6,
+      grid_rows: this.getCardSize()
+    };
   }
 
   _getState(entityId) {
@@ -96,23 +155,19 @@ class SmartPlugCard extends HTMLElement {
     let indicator_on = undefined, indicator_light = null;
 
     if (typeof entityConfig === 'object') {
-      // 从对象配置读取
       power = this._getState(entityConfig.power_entity)?.state || null;
       voltage = this._getState(entityConfig.voltage_entity)?.state || null;
       current = this._getState(entityConfig.current_entity)?.state || null;
       daily = this._getState(entityConfig.daily_energy_entity)?.state || null;
       monthly = this._getState(entityConfig.monthly_energy_entity)?.state || null;
       
-      // 指示灯状态（binary_sensor on/off）
       if (entityConfig.indicator_entity) {
         indicator_on = this._getState(entityConfig.indicator_entity)?.state === 'on';
       }
-      // 指示灯亮度（sensor 数值）
       if (entityConfig.indicator_light_entity) {
         indicator_light = this._getState(entityConfig.indicator_light_entity)?.state || null;
       }
     } else {
-      // 从根配置读取（单个插座）
       power = this._getState(this.config.power_entity)?.state || null;
       voltage = this._getState(this.config.voltage_entity)?.state || null;
       current = this._getState(this.config.current_entity)?.state || null;
@@ -131,13 +186,9 @@ class SmartPlugCard extends HTMLElement {
       switch_entity: switchEntity,
       name: friendlyName,
       is_on: isOn,
-      power: power,
-      voltage: voltage,
-      current: current,
-      daily: daily,
-      monthly: monthly,
-      indicator_on: indicator_on,
-      indicator_light: indicator_light
+      power, voltage, current, daily, monthly,
+      indicator_on,
+      indicator_light
     };
   }
 
@@ -169,9 +220,7 @@ class SmartPlugCard extends HTMLElement {
         indicator_entity: this.config.indicator_entity,
         indicator_light_entity: this.config.indicator_light_entity
       });
-      if (item) {
-        entities.push(item);
-      }
+      if (item) entities.push(item);
     }
 
     return entities;
@@ -187,7 +236,6 @@ class SmartPlugCard extends HTMLElement {
     const dailyDisplay = daily !== null ? `${this._formatEnergy(daily)} kWh` : '--';
     const monthlyDisplay = monthly !== null ? `${this._formatEnergy(monthly)} kWh` : '--';
 
-    // 指示灯状态 (binary_sensor)
     let indicatorHtml = '';
     if (indicator_on !== undefined) {
       const indColor = indicator_on ? '#22c55e' : '#ef4444';
@@ -195,7 +243,6 @@ class SmartPlugCard extends HTMLElement {
       indicatorHtml = `<div class="plug-indicator"><span class="indicator-dot" style="background:${indColor};"></span><span class="indicator-text" style="color:${indColor};">指示灯${indText}</span></div>`;
     }
 
-    // 指示灯亮度 (sensor)
     let indicatorLightHtml = '';
     if (indicator_light !== null && indicator_light !== undefined) {
       indicatorLightHtml = `<div class="plug-indicator-light"><span class="indicator-light-icon">💡</span><span class="indicator-light-value">${indicator_light}</span></div>`;
@@ -235,12 +282,9 @@ class SmartPlugCard extends HTMLElement {
     const onCount = entities.filter(e => e.is_on).length;
     const offCount = totalPlugs - onCount;
 
-    let bodyHtml = '';
-    if (entities.length > 0) {
-      bodyHtml = entities.map(e => this._createPlugItem(e)).join('');
-    } else {
-      bodyHtml = '<div class="empty-state">未配置插座实体</div>';
-    }
+    let bodyHtml = entities.length > 0 
+      ? entities.map(e => this._createPlugItem(e)).join('')
+      : '<div class="empty-state">未配置插座实体</div>';
 
     const statsHtml = totalPlugs > 0 ? `
       <div class="stats-bar">
@@ -251,42 +295,133 @@ class SmartPlugCard extends HTMLElement {
 
     this.shadowRoot.innerHTML = `
       <style>
-        :host { display: block; }
-        ha-card { background: ${background_color}; border-radius: var(--ha-card-border-radius, 16px); box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: visible; }
-        .card-content { padding: 0; font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; color: ${text_color}; overflow: visible; }
-        .card-header { padding: 18px 20px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
-        .card-title { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; }
+        :host {
+          display: block;
+          height: 100%;
+        }
+        
+        ha-card {
+          background: ${background_color};
+          border-radius: var(--ha-card-border-radius, 16px);
+          box-shadow: var(--ha-card-box-shadow, 0 2px 12px rgba(0,0,0,0.08));
+          overflow: visible;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .card-content {
+          padding: 0;
+          font-family: var(--paper-font-common-base_-_font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+          color: ${text_color};
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .card-header {
+          padding: 18px 20px 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        
+        .card-title {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          font-size: 18px;
+          font-weight: 700;
+        }
+        
         .title-icon { font-size: 22px; }
-        .plug-count { background: #f1f5f9; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; color: ${secondary_color}; }
+        .plug-count {
+          background: var(--chip-background-color, #f1f5f9);
+          padding: 4px 10px;
+          border-radius: 12px;
+          font-size: 12px;
+          font-weight: 600;
+          color: ${secondary_color};
+        }
 
-        /* 统计栏 */
-        .stats-bar { display: flex; gap: 12px; padding: 12px 20px; margin: 14px 20px; background: #f8fafc; border-radius: 12px; flex-wrap: wrap; }
-        .stat-item { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 60px; font-size: 12px; }
+        .stats-bar {
+          display: flex;
+          gap: 12px;
+          padding: 12px 20px;
+          margin: 14px 20px;
+          background: var(--secondary-background-color, #f8fafc);
+          border-radius: 12px;
+          flex-wrap: wrap;
+        }
+        
+        .stat-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex: 1;
+          min-width: 60px;
+          font-size: 12px;
+        }
+        
         .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
-        .stat-on .stat-dot { background: #22c55e; }
-        .stat-off .stat-dot { background: #ef4444; }
+        .stat-on .stat-dot { background: var(--success-color, #22c55e); }
+        .stat-off .stat-dot { background: var(--error-color, #ef4444); }
         .stat-label { color: ${secondary_color}; }
         .stat-value { font-weight: 700; margin-left: 2px; }
 
-        /* 布局容器 */
-        .plug-container { padding: 0 12px 12px; overflow: visible; }
-        ${display_mode === 'horizontal' ? `.plug-container { display: grid; grid-template-columns: repeat(${columns || 2}, 1fr); gap: 12px; padding: 0 12px 12px; }` : ''}
+        .plug-container {
+          padding: 0 12px 12px;
+          overflow: visible;
+          flex: 1;
+          ${display_mode === 'horizontal' ? `display: grid; grid-template-columns: repeat(${columns || 2}, 1fr); gap: 12px;` : ''}
+        }
 
-        /* 响应式 */
         @media (max-width: 600px) {
           .plug-container { grid-template-columns: 1fr !important; }
         }
 
-        /* 插座项 */
-        .plug-item { background: #f8fafc; border-radius: 14px; padding: 16px; transition: all 0.2s ease; overflow: visible; min-width: 0; }
-        .plug-header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
-        .plug-status { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-        .plug-status.on { background: #dcfce7; color: #16a34a; }
-        .plug-status.off { background: #fee2e2; color: #dc2626; }
+        .plug-item {
+          background: var(--secondary-background-color, #f8fafc);
+          border-radius: 14px;
+          padding: 16px;
+          transition: all 0.2s ease;
+          overflow: visible;
+          min-width: 0;
+        }
+        
+        .plug-header {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 10px;
+          margin-bottom: 14px;
+        }
+        
+        .plug-status {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        
+        .plug-status.on { background: var(--success-color-light, #dcfce7); color: var(--success-color, #16a34a); }
+        .plug-status.off { background: var(--error-color-light, #fee2e2); color: var(--error-color, #dc2626); }
         .status-icon { font-size: 10px; }
-        .plug-name { font-size: 15px; font-weight: 600; flex: 1; min-width: 60px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .plug-name {
+          font-size: 15px;
+          font-weight: 600;
+          flex: 1;
+          min-width: 60px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
 
-        /* 指示灯 */
         .plug-indicator { display: flex; align-items: center; gap: 5px; margin-left: auto; }
         .indicator-dot { width: 7px; height: 7px; border-radius: 50%; }
         .indicator-text { font-size: 11px; font-weight: 500; }
@@ -294,26 +429,38 @@ class SmartPlugCard extends HTMLElement {
         .indicator-light-icon { font-size: 14px; }
         .indicator-light-value { font-size: 12px; font-weight: 600; color: #f59e0b; }
 
-        /* 指标网格 */
         .plug-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
-        .metric-item { background: #fff; border-radius: 10px; padding: 12px 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-width: 0; }
+        .metric-item {
+          background: var(--card-background-color, #fff);
+          border-radius: 10px;
+          padding: 12px 8px;
+          text-align: center;
+          box-shadow: var(--ha-card-box-shadow, 0 1px 3px rgba(0,0,0,0.05));
+          min-width: 0;
+        }
         .metric-icon { font-size: 16px; display: block; margin-bottom: 4px; }
         .metric-value { font-size: 15px; font-weight: 700; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .metric-label { font-size: 10px; color: ${secondary_color}; display: block; margin-top: 2px; }
 
-        /* 用电量 */
         .plug-energy { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        .energy-item { background: #fff; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-width: 0; }
+        .energy-item {
+          background: var(--card-background-color, #fff);
+          border-radius: 10px;
+          padding: 10px 12px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          box-shadow: var(--ha-card-box-shadow, 0 1px 3px rgba(0,0,0,0.05));
+          min-width: 0;
+        }
         .energy-label { font-size: 12px; color: ${secondary_color}; }
-        .energy-value { font-size: 14px; font-weight: 700; color: #7c3aed; }
+        .energy-value { font-size: 14px; font-weight: 700; color: var(--primary-color, #7c3aed); }
 
-        /* 空状态 */
         .empty-state { padding: 40px 20px; text-align: center; color: ${secondary_color}; font-size: 14px; }
 
-        /* 底部 */
-        .card-footer { padding: 12px 20px 18px; border-top: 1px solid #f1f5f9; margin-top: 4px; }
+        .card-footer { padding: 12px 20px 18px; border-top: 1px solid var(--divider-color, #f1f5f9); margin-top: auto; }
         .update-info { display: flex; align-items: center; gap: 6px; font-size: 11px; color: ${secondary_color}; }
-        .update-dot { width: 6px; height: 6px; background: #7c3aed; border-radius: 50%; }
+        .update-dot { width: 6px; height: 6px; background: var(--primary-color, #7c3aed); border-radius: 50%; }
       </style>
 
       <ha-card>
@@ -331,25 +478,14 @@ class SmartPlugCard extends HTMLElement {
       </ha-card>
     `;
   }
-
-  getCardSize() {
-    const count = this.config?.entities?.length || 1;
-    return display_mode === 'horizontal' ? Math.ceil(count / (this.config?.columns || 2)) * 3 : Math.min(count * 3, 6);
-  }
-
-  static getStubConfig() {
-    return {
-      title: '智能插座',
-      display_mode: 'vertical',
-      columns: 2
-    };
-  }
 }
 
+// 注册自定义元素
 if (!customElements.get('smart-plug-card')) {
   customElements.define('smart-plug-card', SmartPlugCard);
 }
 
+// 注册到 Home Assistant 卡片选择器
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'smart-plug-card',
