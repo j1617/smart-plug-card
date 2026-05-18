@@ -5,12 +5,24 @@ HA插件交流QQ群： 754364399
 关注公众号【工具箱达人】，里面有详细的使用教程
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://hacs.xyz/)
-[![version](https://img.shields.io/badge/version-1.3.0-blue.svg)](https://github.com/j1617/smart-plug-card)
+[![version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/j1617/smart-plug-card)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 一个优雅的 Home Assistant Lovelace 自定义卡片，显示智能插座的开关状态、功率、电压、电流及用电量。
 
-**当前版本: v1.3.0**
+**当前版本: v1.4.0**
+
+## 更新记录
+
+### v1.4.0 (2026-05-18)
+
+#### 新增
+- ⚡ **总功率显示** - 自动计算所有插座功率之和，显示在统计栏
+
+#### 修复
+- 🐛 修复 `set hass()` 高频调用导致卡片闪烁问题（增加数据变更检测）
+
+---
 
 ## 预览效果
 
@@ -20,7 +32,8 @@ HA插件交流QQ群： 754364399
 ┌─────────────────────────────────────────────┐
 │  🔌 智能插座                    2 个插座    │
 │                                             │
-│  🟢 开启 1    ⚪ 关闭 1                     │
+│  ⚡ 总功率 1200W   🟢 开启 1    ⚪ 关闭 1  │
+│                                             │
 │                                             │
 │  ┌─────────────────────────────────────┐     │
 │  │  🟢 已开启                      │     │
@@ -271,7 +284,7 @@ secondary_color: '#94a3b8'
 ## 项目信息
 
 - **GitHub**: https://github.com/j1617/smart-plug-card
-- **版本**: v1.3.0
+- **版本**: v1.4.0
 - **许可证**: MIT
 
 ## 许可证

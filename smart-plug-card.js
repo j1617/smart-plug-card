@@ -1,12 +1,12 @@
 /**
  * Smart Plug Card - Home Assistant Lovelace Custom Card
- * Version: 1.3.0
+ * Version: 1.4.0
  * Description: Display smart plug status (power, voltage, current, energy usage)
  * Compatible with HA 2024.x+ grid layout and visibility features
  */
 
 console.info(
-  '%c SMART-PLUG-CARD %c v1.3.0 ',
+  '%c SMART-PLUG-CARD %c v1.4.0 ',
   'color: #7c3aed; font-weight: bold; background: #f5f3ff; padding: 2px 6px; border-radius: 3px 0 0 3px;',
   'color: white; background: #7c3aed; padding: 2px 6px; border-radius: 0 3px 3px 0;'
 );
@@ -15,11 +15,6 @@ class SmartPlugCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-  }
-
-  // HA 配置验证
-  static getConfigElement() {
-    return document.createElement('smart-plug-card-editor');
   }
 
   static getStubConfig() {
@@ -37,44 +32,50 @@ class SmartPlugCard extends HTMLElement {
     }
 
     this.config = {
-      // 默认配置
       title: '智能插座',
       display_mode: 'vertical',
       columns: 2,
-      // 实体配置
       entities: config.entities || [],
-      // 单个插座配置（兼容）
       switch_entity: config.switch_entity || null,
       power_entity: config.power_entity || null,
       voltage_entity: config.voltage_entity || null,
       current_entity: config.current_entity || null,
       daily_energy_entity: config.daily_energy_entity || null,
       monthly_energy_entity: config.monthly_energy_entity || null,
-      // 指示灯
       indicator_entity: config.indicator_entity || null,
       indicator_light_entity: config.indicator_light_entity || null,
-      // 样式配置（使用HA变量作为默认值）
       background_color: 'var(--ha-card-background, #ffffff)',
       text_color: 'var(--primary-text-color, #1e293b)',
       secondary_color: 'var(--secondary-text-color, #64748b)',
       ...config
     };
 
-    // 保存配置用于 getCardSize
     this._entityCount = this._getEntityCount();
     this._updateCard();
   }
 
   set hass(hass) {
     this._hass = hass;
-    this._updateCard();
+    if (this._dataChanged()) {
+      this._updateCard();
+    }
+  }
+
+  _dataChanged() {
+    if (!this._hass || !this.config) return true;
+    const entities = this._getPlugEntities();
+    const newHash = JSON.stringify(entities.map(e => ({
+      on: e.is_on, power: e.power, daily: e.daily, monthly: e.monthly
+    })));
+    if (newHash === this._lastDataHash) return false;
+    this._lastDataHash = newHash;
+    return true;
   }
 
   connectedCallback() {
     this._updateCard();
   }
 
-  // 获取实体数量
   _getEntityCount() {
     if (this.config.entities && this.config.entities.length > 0) {
       return this.config.entities.length;
@@ -82,20 +83,16 @@ class SmartPlugCard extends HTMLElement {
     return this.config.switch_entity ? 1 : 0;
   }
 
-  // HA Grid 布局支持 - 返回卡片占用的高度单位
   getCardSize() {
     const count = this._entityCount || 1;
     if (this.config.display_mode === 'horizontal') {
-      // 横向模式：根据列数计算行数
       const cols = this.config.columns || 2;
       const rows = Math.ceil(count / cols);
       return Math.max(rows * 3, 3);
     }
-    // 纵向模式：每个插座约3单位，最多6
     return Math.min(count * 3, 6);
   }
 
-  // HA Grid 布局选项 - 响应式配置
   getGridOptions() {
     const count = this._entityCount || 1;
     return {
@@ -104,7 +101,6 @@ class SmartPlugCard extends HTMLElement {
     };
   }
 
-  // HA 可见性支持
   getLayoutOptions() {
     return {
       grid_columns: this.config.display_mode === 'horizontal' ? 12 : 6,
@@ -226,6 +222,16 @@ class SmartPlugCard extends HTMLElement {
     return entities;
   }
 
+  _getTotalPower(entities) {
+    let total = 0;
+    for (const entity of entities) {
+      if (entity.power !== null && !isNaN(parseFloat(entity.power))) {
+        total += parseFloat(entity.power);
+      }
+    }
+    return total > 0 ? total : null;
+  }
+
   _createPlugItem(entity) {
     const { is_on, name, power, voltage, current, daily, monthly, indicator_on, indicator_light } = entity;
     const icon = is_on ? '🟢' : '⚪';
@@ -262,7 +268,7 @@ class SmartPlugCard extends HTMLElement {
         <div class="plug-metrics">
           <div class="metric-item"><span class="metric-icon">⚡</span><span class="metric-value">${powerDisplay}</span><span class="metric-label">功率</span></div>
           <div class="metric-item"><span class="metric-icon">🔌</span><span class="metric-value">${voltageDisplay}</span><span class="metric-label">电压</span></div>
-          <div class="metric-item"><span class="metric-icon">📊</span><span class="metric-value">${currentDisplay}</span><span class="metric-label">电流</span></div>
+          <div class="metric-item"><span class="metric-icon">🔊</span><span class="metric-value">${currentDisplay}</span><span class="metric-label">电流</span></div>
         </div>
         <div class="plug-energy">
           <div class="energy-item"><span class="energy-label">今日用电</span><span class="energy-value">${dailyDisplay}</span></div>
@@ -282,16 +288,29 @@ class SmartPlugCard extends HTMLElement {
     const onCount = entities.filter(e => e.is_on).length;
     const offCount = totalPlugs - onCount;
 
+    const totalPower = this._getTotalPower(entities);
+    const totalPowerDisplay = totalPower !== null ? `${totalPower} W` : '';
+
     let bodyHtml = entities.length > 0 
       ? entities.map(e => this._createPlugItem(e)).join('')
       : '<div class="empty-state">未配置插座实体</div>';
 
-    const statsHtml = totalPlugs > 0 ? `
-      <div class="stats-bar">
-        <div class="stat-item stat-on"><span class="stat-dot"></span><span class="stat-label">开启</span><span class="stat-value">${onCount}</span></div>
-        <div class="stat-item stat-off"><span class="stat-dot"></span><span class="stat-label">关闭</span><span class="stat-value">${offCount}</span></div>
-      </div>
-    ` : '';
+    let statsHtml = '';
+    if (totalPlugs > 0) {
+      statsHtml = `
+        <div class="stats-bar">
+          ${totalPowerDisplay ? `
+            <div class="stat-item stat-power">
+              <span class="stat-icon">⚡</span>
+              <span class="stat-label">总功率</span>
+              <span class="stat-value stat-power-value">${totalPowerDisplay}</span>
+            </div>
+          ` : ''}
+          <div class="stat-item stat-on"><span class="stat-dot"></span><span class="stat-label">开启</span><span class="stat-value">${onCount}</span></div>
+          <div class="stat-item stat-off"><span class="stat-dot"></span><span class="stat-label">关闭</span><span class="stat-value">${offCount}</span></div>
+        </div>
+      `;
+    }
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -365,11 +384,24 @@ class SmartPlugCard extends HTMLElement {
           font-size: 12px;
         }
         
+        .stat-icon { font-size: 14px; }
+        
         .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
         .stat-on .stat-dot { background: var(--success-color, #22c55e); }
         .stat-off .stat-dot { background: var(--error-color, #ef4444); }
         .stat-label { color: ${secondary_color}; }
         .stat-value { font-weight: 700; margin-left: 2px; }
+
+        .stat-power {
+          background: var(--primary-color, #7c3aed);
+          color: white;
+          padding: 6px 12px;
+          border-radius: 8px;
+          flex: 1.5;
+        }
+        .stat-power .stat-label { color: rgba(255,255,255,0.9); }
+        .stat-power .stat-value { color: white; }
+        .stat-power .stat-icon { font-size: 14px; }
 
         .plug-container {
           padding: 0 12px 12px;
@@ -480,12 +512,10 @@ class SmartPlugCard extends HTMLElement {
   }
 }
 
-// 注册自定义元素
 if (!customElements.get('smart-plug-card')) {
   customElements.define('smart-plug-card', SmartPlugCard);
 }
 
-// 注册到 Home Assistant 卡片选择器
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'smart-plug-card',
